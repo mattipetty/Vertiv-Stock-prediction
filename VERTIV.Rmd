@@ -1,0 +1,71 @@
+---
+title: "VRT TRUST"
+author: "Mathew Attipetty"
+date: "2024-04-03"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+
+library(forecast)
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r cars}
+# Assuming the file is in your current working directory or a known path
+file_path <- "C:/Users/matti/Desktop/Vertiv/VRT.csv"
+file_path <- "VRT.csv" # Adjust the path as necessary
+data <- read_csv(file_path)
+data$Date <- as.Date(data$Date, format="%Y-%m-%d")
+```
+
+
+#Time Series object creation
+
+```{r pressure, echo=FALSE}
+ts_data <- ts(data$Close, frequency=365)
+
+```
+
+#Time Series decomposition
+```{r}
+fit <- auto.arima(ts_data)
+future_forecast <- forecast(fit, h=30) # Adjust 'h' for the number of periods you want to forecast
+plot(future_forecast)
+```
+
+#Neural Network modeling
+```{r}
+ts_data <- ts(data$Close, frequency=365)
+```
+
+```{r}
+library(forecast)
+
+# Fit the neural network model
+nn_model <- nnetar(ts_data)
+
+# Summary of the model
+summary(nn_model)
+```
+#Forecast for 30 days
+```{r}
+# Forecast the next 30 days
+nn_forecast <- forecast(nn_model, h=30)
+
+# Plot the forecast
+plot(nn_forecast)
+```
+
+```{r}
+total_points <- length(ts_data)
+last_point <- total_points
+forecast_start <- last_point + 1
+forecast_end <- last_point + 30
+
+plot(nn_forecast, xlim=c(forecast_start - 50, forecast_end))
+```
+
