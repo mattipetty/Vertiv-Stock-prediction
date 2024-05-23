@@ -13,8 +13,32 @@ library(tidyverse)
 library(lubridate)
 ```
 
+For alpha advantage users use these two chunks
+You must utilize an alpha advantage api key
+```{r}
+av_api_key("your_alpha_vantage_api_key_here")
+```
 
-```{r cars}
+
+
+```{r}
+# Get Vertiv stock data using Alpha Vantage
+data <- av_get(symbol = "VRT", av_fun = "TIME_SERIES_DAILY_ADJUSTED", outputsize = "full")
+
+# Rename columns for easier reference
+colnames(data) <- c("Date", "Open", "High", "Low", "Close", "Adjusted_Close", "Volume", "Dividend_Amount", "Split_Coefficient")
+
+# Convert Date to Date format
+data$Date <- as.Date(data$Date)
+
+# View the first few rows of the data
+head(data)
+```
+
+
+
+For Yahoo CSV file users use these chunks and ignore the alpha advantage section above
+```{r}
 # Assuming the file is in your current working directory or a known path
 file_path <- "C:/Users/matti/Desktop/Vertiv/VRT.csv"
 file_path <- "VRT.csv" # Adjust the path as necessary
