@@ -1,0 +1,174 @@
+---
+title: "Sentiment analysis"
+author: "Mathew Attipetty"
+date: "2024-05-27"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidytext)
+library(vader)
+library(httr)
+library(jsonlite)
+
+library(syuzhet)
+library(scales)
+library(vars)
+```
+
+```{r}
+
+fetch_news <- function(stock, from_date, to_date) {
+  api_key <- "YOUR_API_KEY"
+  endpoint <- "https://api.marketaux.com/v1/news/all"
+  page <- 1
+  all_articles <- data.frame()
+  
+  repeat {
+    response <- GET(endpoint, query = list(
+      api_token = api_key,
+      symbols = stock,
+      language = "en",
+      from = from_date,
+      to = to_date,
+      limit = 100,
+      page = page
+    ))
+    
+    if (response$status_code == 429) {
+      Sys.sleep(60) # Wait for 60 seconds before retrying
+      next
+    }
+    
+    if (response$status_code != 200) {
+      stop("Failed to fetch news data: ", response$status_code)
+    }
+    
+    news_data <- content(response, "text")
+    news_json <- fromJSON(news_data)
+    
+    if (length(news_json$data) == 0) {
+      break
+    }
+    
+    articles <- as.data.frame(news_json$data)
+    all_articles <- bind_rows(all_articles, articles)
+    
+    if (!is.null(news_json$pagination) && !news_json$pagination$has_more) {
+      break
+    }
+    
+    page <- page + 1
+  }
+  
+  return(all_articles)
+}
+
+from_date <- Sys.Date() - 100
+to_date <- Sys.Date()
+news_df <- fetch_news("VRT", from_date, to_date)
+
+print(paste("Number of news articles fetched:", nrow(news_df)))
+
+# Calculate Sentiment Scores
+news_df$sentiment <- vader::vader_df(news_df$title)$compound
+
+# Convert the published date to Date type
+news_df$published_date <- as.Date(news_df$published_at)
+
+# Identify and Handle Outliers
+news_df <- news_df %>%
+  filter(between(sentiment, quantile(sentiment, 0.05), quantile(sentiment, 0.95)))
+
+# Aggregate sentiment scores by date
+daily_sentiment <- news_df %>%
+  group_by(published_date) %>%
+  summarise(average_sentiment = mean(sentiment, na.rm = TRUE))
+
+print(daily_sentiment)
+
+```
+
+Calculate Sentiment scores
+
+```{r}
+# Calculate sentiment scores using vader
+news_df$sentiment <- vader::vader_df(news_df$title)$compound
+
+# Convert the published date to Date type
+news_df$published_date <- as.Date(news_df$published_at)
+
+# Identify and Handle Outliers
+news_df <- news_df %>%
+  filter(between(sentiment, quantile(sentiment, 0.05), quantile(sentiment, 0.95)))
+
+# Aggregate sentiment scores by date
+daily_sentiment <- news_df %>%
+  group_by(published_date) %>%
+  summarise(average_sentiment = mean(sentiment, na.rm = TRUE))
+
+```
+
+
+Get Vertiv Stock price data from yahoo financial 
+```{r}
+
+# Fetch VERTIV Stock Prices
+stock_prices <- read_csv("C:/Users/matti/Desktop/Vertiv/VRT.csv")
+stock_prices$Date <- as.Date(stock_prices$Date, format = "%Y-%m-%d")
+stock_prices <- stock_prices %>%
+  filter(Date >= from_date & Date <= to_date)
+
+# Ensure the 'Close' column exists
+if (!"Close" %in% names(stock_prices)) {
+  stop("The 'Close' column is not found in the stock_prices dataset.")
+}
+
+# Merge Sentiment and Stock Prices Data
+merged_data <- daily_sentiment %>%
+  left_join(stock_prices, by = c("published_date" = "Date"))
+```
+
+
+
+Plot Sentiment thread
+```{r}
+# Select the relevant columns and make sure there are no missing values
+var_data <- merged_data %>%
+  select(published_date, average_sentiment, Close) %>%
+  na.omit()
+
+# Convert to a time series object
+var_ts <- ts(var_data[, -1], start = c(as.numeric(format(min(var_data$published_date), "%Y")), as.numeric(format(min(var_data$published_date), "%j"))), frequency = 365)
+```
+
+Fit the var model
+```{r}
+var_model <- VAR(var_ts, p = 2, type = "both")
+summary(var_model)
+```
+Plot the forecast
+```{r}
+var_forecast <- predict(var_model, n.ahead = 30)
+
+# Plot the forecasts
+plot(var_forecast)
+
+# Extract the forecasted values for the stock prices
+stock_forecast <- var_forecast$fcst$Close[, "fcst"]
+dates <- seq.Date(from = max(merged_data$published_date), by = "day", length.out = 30)
+
+forecast_df <- data.frame(Date = dates, Stock_Price_Forecast = stock_forecast)
+
+# Plot the forecasted stock prices along with the actual stock prices
+ggplot() +
+  geom_line(data = stock_prices, aes(x = Date, y = Close), color = "blue") +
+  geom_line(data = forecast_df, aes(x = Date, y = Stock_Price_Forecast), color = "red", linetype = "dashed") +
+  labs(title = "Stock Price Forecast with Sentiment Data",
+       x = "Date",
+       y = "Stock Price") +
+  theme_minimal()
+```
+
