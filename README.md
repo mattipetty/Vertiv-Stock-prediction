@@ -1,1 +1,1 @@
-Simple Neural Network design and utilizing VERTIV stock time series from Yahoo financial. Will continue to update with new code
+Utilizing Neural networks, sentimentality analysis, and other projections we can predict the performance of Vertiv stock. (utilizing API)
