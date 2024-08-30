@@ -21,7 +21,7 @@ library(vars)
 ```{r}
 
 fetch_news <- function(stock, from_date, to_date) {
-  api_key <- "hc3NCyHkaoyYs3EFuDO8Wk0ZWcLje04HLAkSlDDU"
+  api_key <- "INSERT API KEY HERE"
   endpoint <- "https://api.marketaux.com/v1/news/all"
   page <- 1
   all_articles <- data.frame()
